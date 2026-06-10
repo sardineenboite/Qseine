@@ -1,108 +1,3 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<title>Débit Yonne - Seine - Loing</title>
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-<style>
-body {
-    font-family: Arial, sans-serif;
-    background: #f4f7fb;
-    margin: 0;
-    padding: 20px;
-    max-width: 1200px;
-    margin: auto;
-}
-
-h1 {
-    text-align: center;
-}
-
-.header {
-    text-align: center;
-    color: #555;
-    margin-bottom: 20px;
-}
-
-.grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 15px;
-}
-
-.card {
-    background: white;
-    padding: 15px;
-    border-radius: 10px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-}
-
-.card h3 {
-    margin: 0;
-}
-
-.value {
-    font-size: 28px;
-    font-weight: bold;
-    margin-top: 10px;
-}
-
-.total {
-    background: #e8f3ff;
-}
-
-.chart {
-    background: white;
-    margin-top: 25px;
-    padding: 15px;
-    border-radius: 10px;
-}
-</style>
-
-</head>
-
-<body>
-
-<h1>Débit entrant vers Montereau</h1>
-
-<div class="header" id="update">Chargement...</div>
-
-<div class="grid">
-
-<div class="card">
-<h3>Yonne</h3>
-<p>Pont-sur-Yonne</p>
-<div class="value" id="yonne">--</div>
-</div>
-
-<div class="card">
-<h3>Seine</h3>
-<p>Bazoches-lès-Bray</p>
-<div class="value" id="seine">--</div>
-</div>
-
-<div class="card">
-<h3>Loing</h3>
-<p>Épisy</p>
-<div class="value" id="loing">--</div>
-</div>
-
-<div class="card total">
-<h3>Total</h3>
-<p>Somme des débits</p>
-<div class="value" id="total">--</div>
-</div>
-
-</div>
-
-<div class="chart">
-<canvas id="chart"></canvas>
-</div>
-
 <script>
 
 const STATIONS = {
@@ -115,18 +10,31 @@ let chart;
 
 async function fetchLatest(code) {
 
-    const url = `https://hubeau.eaufrance.fr/api/v2/hydrometrie/obs_elab?code_entite=${code}&size=1&grandeur_hydro=Q`;
+    const url =
+        `https://hubeau.eaufrance.fr/api/v2/hydrometrie/observations_tr` +
+        `?code_entite=${code}&size=1&grandeur_hydro=Q`;
 
     const res = await fetch(url);
     const json = await res.json();
 
-    if (!json.data || json.data.length === 0) return null;
+    if (!json.data || json.data.length === 0) {
+        console.warn("Pas de données pour", code);
+        return { m3s: 0, date: null };
+    }
 
-    const val_l_s = json.data[0].resultat_obs;
+    const row = json.data[0];
+
+    // sécurité : certains capteurs renvoient null
+    const l_s = Number(row.resultat_obs);
+
+    if (isNaN(l_s)) {
+        console.warn("Valeur invalide pour", code, row);
+        return { m3s: 0, date: null };
+    }
 
     return {
-        m3s: val_l_s / 1000,
-        date: json.data[0].date_obs
+        m3s: l_s / 1000,
+        date: row.date_obs
     };
 }
 
@@ -140,22 +48,30 @@ async function refresh() {
             fetchLatest(STATIONS.loing)
         ]);
 
-        document.getElementById("yonne").innerText = y.m3s.toFixed(1) + " m³/s";
-        document.getElementById("seine").innerText = s.m3s.toFixed(1) + " m³/s";
-        document.getElementById("loing").innerText = l.m3s.toFixed(1) + " m³/s";
+        document.getElementById("yonne").innerText =
+            y.m3s.toFixed(1) + " m³/s";
+
+        document.getElementById("seine").innerText =
+            s.m3s.toFixed(1) + " m³/s";
+
+        document.getElementById("loing").innerText =
+            l.m3s.toFixed(1) + " m³/s";
 
         const total = y.m3s + s.m3s + l.m3s;
 
-        document.getElementById("total").innerText = total.toFixed(1) + " m³/s";
+        document.getElementById("total").innerText =
+            total.toFixed(1) + " m³/s";
 
         document.getElementById("update").innerText =
-            "Dernière mise à jour : " + new Date().toLocaleString("fr-FR");
+            "Dernière mise à jour : " +
+            new Date().toLocaleString("fr-FR");
 
         updateChart(y.m3s, s.m3s, l.m3s);
 
     } catch (e) {
         console.error(e);
-        document.getElementById("update").innerText = "Erreur de chargement API";
+        document.getElementById("update").innerText =
+            "Erreur API (voir console)";
     }
 }
 
@@ -186,6 +102,3 @@ refresh();
 setInterval(refresh, 15 * 60 * 1000);
 
 </script>
-
-</body>
-</html>
