@@ -1,21 +1,79 @@
-<h1>Débit entrant Montereau</h1>
-
-<p>Yonne : <span id="yonne">chargement</span></p>
-<p>Seine : <span id="seine">chargement</span></p>
-<p>Loing : <span id="loing">chargement</span></p>
-
-<p>Total : <span id="total">calcul</span></p>
-
-
 <script>
 
-document.getElementById("yonne").innerHTML="OK";
-document.getElementById("seine").innerHTML="OK";
-document.getElementById("loing").innerHTML="OK";
-document.getElementById("total").innerHTML="OK";
+const stations = {
+  yonne: "F358000402",
+  seine: "F240000106",
+  loing: "F439000101"
+};
+
+
+async function getDebit(code){
+
+  const url =
+  "https://hubeau.eaufrance.fr/api/v2/hydrometrie/observations_tr" +
+  "?code_entite=" + code +
+  "&grandeur_hydro=Q" +
+  "&size=1";
+
+
+  const response = await fetch(url);
+
+  const json = await response.json();
+
+
+  console.log(code,json);
+
+
+  if(!json.data || json.data.length===0){
+
+    return 0;
+
+  }
+
+
+  return Number(json.data[0].resultat_obs)/1000;
+
+}
+
+
+
+async function refresh(){
+
+
+  const yonne = await getDebit(stations.yonne);
+
+  const seine = await getDebit(stations.seine);
+
+  const loing = await getDebit(stations.loing);
+
+
+
+  document.getElementById("yonne").innerHTML =
+  yonne.toFixed(1)+" m³/s";
+
+
+  document.getElementById("seine").innerHTML =
+  seine.toFixed(1)+" m³/s";
+
+
+  document.getElementById("loing").innerHTML =
+  loing.toFixed(1)+" m³/s";
+
+
+  document.getElementById("total").innerHTML =
+  (yonne+seine+loing).toFixed(1)+" m³/s";
+
+
+}
+
+
+refresh();
+
+
+setInterval(
+ refresh,
+ 15*60*1000
+);
+
 
 </script>
-
-
-</body>
-</html>
