@@ -8,97 +8,186 @@ const STATIONS = {
 
 let chart;
 
-async function fetchLatest(code) {
+
+async function fetchDebit(code){
 
     const url =
-        `https://hubeau.eaufrance.fr/api/v2/hydrometrie/observations_tr` +
-        `?code_entite=${code}&size=1&grandeur_hydro=Q`;
+    "https://hubeau.eaufrance.fr/api/v2/hydrometrie/observations_tr" +
+    "?code_entite=" + code +
+    "&grandeur_hydro=Q" +
+    "&size=1" +
+    "&fields=date_obs,resultat_obs";
 
-    const res = await fetch(url);
-    const json = await res.json();
+    const response = await fetch(url);
 
-    if (!json.data || json.data.length === 0) {
-        console.warn("Pas de données pour", code);
-        return { m3s: 0, date: null };
+    const json = await response.json();
+
+    console.log(code, json);
+
+
+    if(!json.data || json.data.length === 0){
+
+        return {
+            debit: null,
+            date: null
+        };
     }
 
-    const row = json.data[0];
 
-    // sécurité : certains capteurs renvoient null
-    const l_s = Number(row.resultat_obs);
+    const mesure = json.data[0];
 
-    if (isNaN(l_s)) {
-        console.warn("Valeur invalide pour", code, row);
-        return { m3s: 0, date: null };
-    }
 
     return {
-        m3s: l_s / 1000,
-        date: row.date_obs
+
+        debit: Number(mesure.resultat_obs) / 1000,
+
+        date: mesure.date_obs
     };
+
 }
 
-async function refresh() {
 
-    try {
 
-        const [y, s, l] = await Promise.all([
-            fetchLatest(STATIONS.yonne),
-            fetchLatest(STATIONS.seine),
-            fetchLatest(STATIONS.loing)
-        ]);
+async function refresh(){
 
-        document.getElementById("yonne").innerText =
-            y.m3s.toFixed(1) + " m³/s";
 
-        document.getElementById("seine").innerText =
-            s.m3s.toFixed(1) + " m³/s";
+try{
 
-        document.getElementById("loing").innerText =
-            l.m3s.toFixed(1) + " m³/s";
 
-        const total = y.m3s + s.m3s + l.m3s;
+const [yonne,seine,loing] = await Promise.all([
 
-        document.getElementById("total").innerText =
-            total.toFixed(1) + " m³/s";
+fetchDebit(STATIONS.yonne),
 
-        document.getElementById("update").innerText =
-            "Dernière mise à jour : " +
-            new Date().toLocaleString("fr-FR");
+fetchDebit(STATIONS.seine),
 
-        updateChart(y.m3s, s.m3s, l.m3s);
+fetchDebit(STATIONS.loing)
 
-    } catch (e) {
-        console.error(e);
-        document.getElementById("update").innerText =
-            "Erreur API (voir console)";
-    }
+]);
+
+
+
+document.getElementById("yonne").innerHTML =
+yonne.debit === null
+? "N/A"
+: yonne.debit.toFixed(1)+" m³/s";
+
+
+
+document.getElementById("seine").innerHTML =
+seine.debit === null
+? "N/A"
+: seine.debit.toFixed(1)+" m³/s";
+
+
+
+document.getElementById("loing").innerHTML =
+loing.debit === null
+? "N/A"
+: loing.debit.toFixed(1)+" m³/s";
+
+
+
+let total = 0;
+
+
+if(yonne.debit) total += yonne.debit;
+if(seine.debit) total += seine.debit;
+if(loing.debit) total += loing.debit;
+
+
+
+document.getElementById("total").innerHTML =
+total.toFixed(1)+" m³/s";
+
+
+
+document.getElementById("update").innerHTML =
+"Dernière mise à jour : "
++ new Date().toLocaleString("fr-FR");
+
+
+
+updateChart(
+yonne.debit || 0,
+seine.debit || 0,
+loing.debit || 0
+);
+
+
+
+}
+catch(e){
+
+console.error(e);
+
+document.getElementById("update").innerHTML =
+"Erreur API";
+
 }
 
-function updateChart(y, s, l) {
 
-    const data = [y, s, l];
-
-    if (!chart) {
-
-        chart = new Chart(document.getElementById("chart"), {
-            type: "bar",
-            data: {
-                labels: ["Yonne", "Seine", "Loing"],
-                datasets: [{
-                    label: "Débit (m³/s)",
-                    data: data
-                }]
-            }
-        });
-
-    } else {
-        chart.data.datasets[0].data = data;
-        chart.update();
-    }
 }
+
+
+
+function updateChart(y,s,l){
+
+
+const data=[y,s,l];
+
+
+if(!chart){
+
+
+chart = new Chart(
+document.getElementById("chart"),
+{
+
+type:"bar",
+
+data:{
+
+labels:[
+"Yonne",
+"Seine",
+"Loing"
+],
+
+datasets:[{
+
+label:"Débit m³/s",
+
+data:data
+
+}]
+
+}
+
+});
+
+
+}
+
+else{
+
+chart.data.datasets[0].data=data;
+
+chart.update();
+
+}
+
+
+}
+
+
 
 refresh();
-setInterval(refresh, 15 * 60 * 1000);
+
+
+setInterval(
+refresh,
+15*60*1000
+);
+
 
 </script>
